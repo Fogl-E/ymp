@@ -1,0 +1,9 @@
+No syntax errors found.
+No semantic errors found.
+
+=== POSTFIX NOTATION ===
+int x 2 decl
+char y 2 decl
+8 x =
+"kf" y =
+x RETURN
