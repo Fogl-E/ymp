@@ -103,7 +103,6 @@ std::shared_ptr<ParseTreeNode> Parser::parseDescriptions() {
     while (currentToken.type == TokenType::INT || currentToken.type == TokenType::CHAR) {
         node->addChild(parseDescr());
     }
-
     return node;
 }
 
@@ -158,7 +157,6 @@ std::shared_ptr<ParseTreeNode> Parser::parseVarList() {
 
 std::shared_ptr<ParseTreeNode> Parser::parseType() {
     auto node = std::make_shared<ParseTreeNode>("Type", Token(), currentToken.line);
-
     if (currentToken.type == TokenType::INT) {
         auto typeNode = std::make_shared<ParseTreeNode>("int", currentToken, currentToken.line);
         node->addChild(typeNode);
@@ -196,7 +194,6 @@ std::shared_ptr<ParseTreeNode> Parser::parseOp() {
             else {
                 node->addChild(parseNumExpr());
             }
-
             if (hasErrors()) {
                 synchronizeToStatementEnd();
             }
@@ -237,13 +234,9 @@ std::shared_ptr<ParseTreeNode> Parser::parseOp() {
 
 std::shared_ptr<ParseTreeNode> Parser::parseNumExpr() {
     auto node = std::make_shared<ParseTreeNode>("NumExpr", Token(), currentToken.line);
-
     if (parseSimpleNumExpr(node)) {
         while (currentToken.type == TokenType::PLUS || currentToken.type == TokenType::MINUS) {
-            auto opNode = std::make_shared<ParseTreeNode>(
-                currentToken.type == TokenType::PLUS ? "Plus" : "Minus",
-                currentToken, currentToken.line
-            );
+            auto opNode = std::make_shared<ParseTreeNode>(currentToken.type == TokenType::PLUS ? "Plus" : "Minus", currentToken, currentToken.line);
             node->addChild(opNode);
             if (currentToken.type == TokenType::PLUS) {
                 match(TokenType::PLUS);

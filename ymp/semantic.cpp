@@ -2,10 +2,49 @@
 #include <iostream>
 #include <sstream>
 
-SymbolInfo::SymbolInfo(const std::string& n, SymbolType t, int l, bool isFunc, SymbolType retType) : name(n), type(t), line(l), isFunction(isFunc), returnType(retType) {
+SymbolInfo::SymbolInfo(const std::string& n, SymbolType t, int l, bool isFunc, SymbolType retType)
+    : name(n), type(t), line(l), isFunction(isFunc), returnType(retType) {
 }
 
-SemanticAnalyzer::SemanticAnalyzer() : currentFunctionReturnType(SymbolType::UNDEFINED), currentFunctionName("") {
+SemanticAnalyzer::SemanticAnalyzer()
+    : symbolTable(), currentFunctionReturnType(SymbolType::UNDEFINED), currentFunctionName("") {
+}
+int SemanticAnalyzer::findSymbolIndex(const std::string& name) const {
+    Token tempToken;
+    tempToken.value = name;
+    tempToken.type = TokenType::ID;
+    for (size_t i = 0; i < symbolInfoList.size(); ++i) {
+        if (symbolInfoList[i].name == name) {
+            return static_cast<int>(i);
+        }
+    }
+    return -1;
+}
+
+const SymbolInfo* SemanticAnalyzer::findSymbolInfo(const std::string& name) const {
+    for (const auto& info : symbolInfoList) {
+        if (info.name == name) {
+            return &info;
+        }
+    }
+    return nullptr;
+}
+
+SymbolInfo* SemanticAnalyzer::findSymbolInfo(const std::string& name) {
+    for (auto& info : symbolInfoList) {
+        if (info.name == name) {
+            return &info;
+        }
+    }
+    return nullptr;
+}
+
+void SemanticAnalyzer::addSymbolInfo(const SymbolInfo& info) {
+    symbolInfoList.push_back(info);
+    Token tempToken;
+    tempToken.value = info.name;
+    tempToken.type = TokenType::ID;
+    symbolTable.insert(tempToken);
 }
 
 void SemanticAnalyzer::addError(const std::string& message, int line) {
@@ -15,11 +54,13 @@ void SemanticAnalyzer::addError(const std::string& message, int line) {
 }
 
 SymbolType SemanticAnalyzer::getTypeFromToken(TokenType tokenType) {
-    switch (tokenType) {
-    case TokenType::INT: return SymbolType::INT_TYPE;
-    case TokenType::CHAR: return SymbolType::CHAR_TYPE;
-    default: return SymbolType::UNDEFINED;
+    if (tokenType == TokenType::INT) {
+        return SymbolType::INT_TYPE;
     }
+    else if (tokenType == TokenType::CHAR) {
+        return SymbolType::CHAR_TYPE;
+    }
+    return SymbolType::UNDEFINED;
 }
 
 void SemanticAnalyzer::analyze(std::shared_ptr<ParseTreeNode> root) {
@@ -28,7 +69,9 @@ void SemanticAnalyzer::analyze(std::shared_ptr<ParseTreeNode> root) {
 }
 
 void SemanticAnalyzer::analyzeNode(std::shared_ptr<ParseTreeNode> node) {
-    if (!node) return;
+    if (!node) {
+        return;
+    }
     if (node->name == "Function") {
         analyzeFunction(node);
     }
@@ -36,6 +79,7 @@ void SemanticAnalyzer::analyzeNode(std::shared_ptr<ParseTreeNode> node) {
         analyzeNode(child);
     }
 }
+
 void SemanticAnalyzer::analyzeFunction(std::shared_ptr<ParseTreeNode> funcNode) {
     currentFunctionReturnType = SymbolType::UNDEFINED;
     currentFunctionName = "";
@@ -66,11 +110,11 @@ void SemanticAnalyzer::analyzeBegin(std::shared_ptr<ParseTreeNode> beginNode) {
         if (nameNode->name == "FunctionName" && !nameNode->children.empty()) {
             currentFunctionName = nameNode->children[0]->token.value;
             int line = nameNode->children[0]->token.line;
-            if (symbolTable.find(currentFunctionName) != symbolTable.end()) {
+            if (findSymbolInfo(currentFunctionName) != nullptr) {
                 addError("Function '" + currentFunctionName + "' already declared", line);
             }
             else {
-                symbolTable[currentFunctionName] = SymbolInfo(currentFunctionName, SymbolType::FUNCTION_TYPE, line, true, currentFunctionReturnType);
+                addSymbolInfo(SymbolInfo(currentFunctionName, SymbolType::FUNCTION_TYPE, line, true, currentFunctionReturnType));
             }
         }
     }
@@ -88,7 +132,6 @@ void SemanticAnalyzer::analyzeDescr(std::shared_ptr<ParseTreeNode> descrNode) {
     if (descrNode->children.size() >= 2) {
         auto typeNode = descrNode->children[0];
         auto varListNode = descrNode->children[1];
-
         SymbolType varType = SymbolType::UNDEFINED;
         if (typeNode->name == "Type" && !typeNode->children.empty()) {
             TokenType tokenType = typeNode->children[0]->token.type;
@@ -103,13 +146,13 @@ void SemanticAnalyzer::analyzeVarList(std::shared_ptr<ParseTreeNode> varListNode
         if (child->name == "Id") {
             std::string varName = child->token.value;
             int line = child->token.line;
-            if (symbolTable.find(varName) != symbolTable.end()) {
-                auto existing = symbolTable[varName];
-                std::string existingWhat = existing.isFunction ? "function" : "variable";
-                addError("'" + varName + "' already declared as " + existingWhat + " at line " + std::to_string(existing.line), line);
+            const SymbolInfo* existing = findSymbolInfo(varName);
+            if (existing != nullptr) {
+                std::string existingWhat = existing->isFunction ? "function" : "variable";
+                addError("'" + varName + "' already declared as " + existingWhat + " at line " + std::to_string(existing->line), line);
             }
             else {
-                symbolTable[varName] = SymbolInfo(varName, type, line);
+                addSymbolInfo(SymbolInfo(varName, type, line));
             }
         }
     }
@@ -129,19 +172,19 @@ void SemanticAnalyzer::analyzeOp(std::shared_ptr<ParseTreeNode> opNode) {
         if (idNode->name == "Id") {
             std::string varName = idNode->token.value;
             int line = idNode->token.line;
-            if (symbolTable.find(varName) == symbolTable.end()) {
+            SymbolInfo* varInfo = findSymbolInfo(varName);
+            if (varInfo == nullptr) {
                 addError("Undeclared variable '" + varName + "'", line);
                 return;
             }
-            SymbolInfo& varInfo = symbolTable[varName];
             auto exprNode = opNode->children[1];
             if (exprNode->name == "NumExpr") {
-                checkNumExprForAssignment(exprNode, varInfo, line);
-                checkNumExpr(exprNode); 
+                checkNumExprForAssignment(exprNode, *varInfo, line);
+                checkNumExpr(exprNode);
             }
             else if (exprNode->name == "StringExpr") {
                 checkStringExpr(exprNode);
-                if (varInfo.type == SymbolType::INT_TYPE) {
+                if (varInfo->type == SymbolType::INT_TYPE) {
                     addError("cannot assign char to int variable '" + varName + "'", line);
                 }
             }
@@ -154,13 +197,13 @@ void SemanticAnalyzer::checkNumExprForAssignment(std::shared_ptr<ParseTreeNode> 
     if (!node) return;
     if (node->name == "Id") {
         std::string exprVarName = node->token.value;
-        if (symbolTable.find(exprVarName) != symbolTable.end()) {
-            SymbolInfo& exprVarInfo = symbolTable[exprVarName];
-            if (targetVar.type == SymbolType::INT_TYPE && exprVarInfo.type == SymbolType::CHAR_TYPE) {
+        const SymbolInfo* exprVarInfo = findSymbolInfo(exprVarName);
+        if (exprVarInfo != nullptr) {
+            if (targetVar.type == SymbolType::INT_TYPE && exprVarInfo->type == SymbolType::CHAR_TYPE) {
                 addError("cannot assign char '" + exprVarName + "' to int '" + targetVar.name + "'",
                     assignmentLine);
             }
-            else if (targetVar.type == SymbolType::CHAR_TYPE && exprVarInfo.type == SymbolType::INT_TYPE) {
+            else if (targetVar.type == SymbolType::CHAR_TYPE && exprVarInfo->type == SymbolType::INT_TYPE) {
                 addError("cannot assign int '" + exprVarName + "' to char '" + targetVar.name + "'",
                     assignmentLine);
             }
@@ -189,12 +232,12 @@ SymbolType SemanticAnalyzer::checkSimpleNumExpr(std::shared_ptr<ParseTreeNode> n
     for (const auto& child : node->children) {
         if (child->name == "Id") {
             std::string varName = child->token.value;
-            if (symbolTable.find(varName) == symbolTable.end()) {
+            const SymbolInfo* varInfo = findSymbolInfo(varName);
+            if (varInfo == nullptr) {
                 addError("Undeclared variable '" + varName + "'", child->token.line);
                 return SymbolType::UNDEFINED;
             }
-            SymbolInfo& varInfo = symbolTable[varName];
-            if (varInfo.type != SymbolType::INT_TYPE) {
+            if (varInfo->type != SymbolType::INT_TYPE) {
                 addError("Variable '" + varName + "' must be integer type in numeric expression", child->token.line);
                 return SymbolType::UNDEFINED;
             }
@@ -232,18 +275,18 @@ void SemanticAnalyzer::analyzeEnd(std::shared_ptr<ParseTreeNode> endNode) {
         if (returnIdNode->name == "Id") {
             std::string varName = returnIdNode->token.value;
             int line = returnIdNode->token.line;
-            if (symbolTable.find(varName) == symbolTable.end()) {
+            const SymbolInfo* varInfo = findSymbolInfo(varName);
+            if (varInfo == nullptr) {
                 addError("Undeclared variable '" + varName + "' in return statement", line);
                 return;
             }
-            SymbolInfo& varInfo = symbolTable[varName];
-            if (varInfo.isFunction) {
+            if (varInfo->isFunction) {
                 addError("Cannot return function '" + varName + "'", line);
                 return;
             }
-            if (varInfo.type != currentFunctionReturnType) {
+            if (varInfo->type != currentFunctionReturnType) {
                 std::string funcType = (currentFunctionReturnType == SymbolType::INT_TYPE) ? "int" : "char";
-                std::string varType = (varInfo.type == SymbolType::INT_TYPE) ? "int" : "char";
+                std::string varType = (varInfo->type == SymbolType::INT_TYPE) ? "int" : "char";
                 addError("function returns " + funcType + " but variable is " + varType, line);
             }
         }

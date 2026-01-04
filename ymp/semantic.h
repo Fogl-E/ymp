@@ -2,7 +2,7 @@
 #define SEMANTIC_H
 
 #include "parser.h"
-#include <unordered_map>
+#include "hashtable.h"  
 #include <string>
 #include <vector>
 #include <fstream>
@@ -25,7 +25,8 @@ struct SymbolInfo {
 
 class SemanticAnalyzer {
 private:
-    std::unordered_map<std::string, SymbolInfo> symbolTable;
+    HashTable symbolTable; 
+    std::vector<SymbolInfo> symbolInfoList;  
     std::vector<std::string> errors;
     SymbolType currentFunctionReturnType;
     std::string currentFunctionName;
@@ -44,6 +45,11 @@ private:
     SymbolType checkNumExpr(std::shared_ptr<ParseTreeNode> node);
     SymbolType checkStringExpr(std::shared_ptr<ParseTreeNode> node);
     SymbolType checkSimpleNumExpr(std::shared_ptr<ParseTreeNode> node);
+    int findSymbolIndex(const std::string& name) const;
+    const SymbolInfo* findSymbolInfo(const std::string& name) const;
+    SymbolInfo* findSymbolInfo(const std::string& name);
+    void addSymbolInfo(const SymbolInfo& info);
+
     void generatePostfixForNode(std::shared_ptr<ParseTreeNode> node, std::ofstream& outFile);
 
 public:
