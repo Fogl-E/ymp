@@ -39,6 +39,7 @@ private:
     void analyzeVarList(std::shared_ptr<ParseTreeNode> varListNode, SymbolType type);
     void analyzeOperators(std::shared_ptr<ParseTreeNode> operatorsNode);
     void analyzeOp(std::shared_ptr<ParseTreeNode> opNode);
+    void checkNumExprForAssignment(std::shared_ptr<ParseTreeNode> opNode, const SymbolInfo& targetVar, int assignmentLine);
     void analyzeEnd(std::shared_ptr<ParseTreeNode> endNode);
     SymbolType checkNumExpr(std::shared_ptr<ParseTreeNode> node);
     SymbolType checkStringExpr(std::shared_ptr<ParseTreeNode> node);

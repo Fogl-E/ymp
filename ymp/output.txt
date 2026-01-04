@@ -1,9 +1,12 @@
 No syntax errors found.
-No semantic errors found.
+SEMANTIC ERRORS:
+Semantic error at line 6: cannot assign int 'x' to char 'y'
+Semantic error at line 6: cannot assign integer '3' to char 'y'
 
 === POSTFIX NOTATION ===
 int x 2 decl
 char y 2 decl
 8 x =
 "kf" y =
+x 3 + y =
 x RETURN

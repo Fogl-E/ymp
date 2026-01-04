@@ -129,43 +129,20 @@ void SemanticAnalyzer::analyzeOp(std::shared_ptr<ParseTreeNode> opNode) {
         if (idNode->name == "Id") {
             std::string varName = idNode->token.value;
             int line = idNode->token.line;
+
+            // Проверка объявления переменной
             if (symbolTable.find(varName) == symbolTable.end()) {
                 addError("Undeclared variable '" + varName + "'", line);
                 return;
             }
+
             SymbolInfo& varInfo = symbolTable[varName];
             auto exprNode = opNode->children[1];
-            if (exprNode->name == "NumExpr") {
-                std::vector<std::shared_ptr<ParseTreeNode>> stack;
-                stack.push_back(exprNode);
-                bool foundError = false;
-                while (!stack.empty() && !foundError) {
-                    auto current = stack.back();
-                    stack.pop_back();
-                    if (current->name == "Id") {
-                        std::string exprVarName = current->token.value;
-                        if (symbolTable.find(exprVarName) != symbolTable.end()) {
-                            SymbolInfo& exprVarInfo = symbolTable[exprVarName];
-                            if (varInfo.type == SymbolType::INT_TYPE && exprVarInfo.type == SymbolType::CHAR_TYPE) {
-                                addError("cannot assign char '" + exprVarName + "' to int '" + varName + "'", line);
-                                foundError = true;
-                            }
-                            else if (varInfo.type == SymbolType::CHAR_TYPE && exprVarInfo.type == SymbolType::INT_TYPE) {
-                                addError("cannot assign int '" + exprVarName + "' to char '" + varName + "'", line);
-                                foundError = true;
-                            }
-                        }
-                    }
-                    else if (current->name == "Const" && varInfo.type == SymbolType::CHAR_TYPE) {
-                        addError("cannot assign integer '" + current->token.value + "' to char '" + varName + "'", line);
-                        foundError = true;
-                    }
 
-                    for (const auto& child : current->children) {
-                        stack.push_back(child);
-                    }
-                }
-                checkNumExpr(exprNode);
+            if (exprNode->name == "NumExpr") {
+                // Анализ числового выражения с рекурсивным обходом
+                checkNumExprForAssignment(exprNode, varInfo, line);
+                checkNumExpr(exprNode); // Дополнительная проверка выражения
             }
             else if (exprNode->name == "StringExpr") {
                 checkStringExpr(exprNode);
@@ -174,6 +151,41 @@ void SemanticAnalyzer::analyzeOp(std::shared_ptr<ParseTreeNode> opNode) {
                 }
             }
         }
+    }
+}
+
+// Рекурсивная функция для проверки совместимости типов в присваивании
+void SemanticAnalyzer::checkNumExprForAssignment(std::shared_ptr<ParseTreeNode> node,
+    const SymbolInfo& targetVar,
+    int assignmentLine) {
+    if (!node) return;
+
+    // Проверка идентификаторов в выражении
+    if (node->name == "Id") {
+        std::string exprVarName = node->token.value;
+        if (symbolTable.find(exprVarName) != symbolTable.end()) {
+            SymbolInfo& exprVarInfo = symbolTable[exprVarName];
+
+            // Проверка совместимости типов
+            if (targetVar.type == SymbolType::INT_TYPE && exprVarInfo.type == SymbolType::CHAR_TYPE) {
+                addError("cannot assign char '" + exprVarName + "' to int '" + targetVar.name + "'",
+                    assignmentLine);
+            }
+            else if (targetVar.type == SymbolType::CHAR_TYPE && exprVarInfo.type == SymbolType::INT_TYPE) {
+                addError("cannot assign int '" + exprVarName + "' to char '" + targetVar.name + "'",
+                    assignmentLine);
+            }
+        }
+    }
+    // Проверка констант для char переменных
+    else if (node->name == "Const" && targetVar.type == SymbolType::CHAR_TYPE) {
+        addError("cannot assign integer '" + node->token.value + "' to char '" + targetVar.name + "'",
+            assignmentLine);
+    }
+
+    // Рекурсивный обход дочерних узлов
+    for (const auto& child : node->children) {
+        checkNumExprForAssignment(child, targetVar, assignmentLine);
     }
 }
 SymbolType SemanticAnalyzer::checkNumExpr(std::shared_ptr<ParseTreeNode> node) {
