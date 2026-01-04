@@ -1,3 +1,5 @@
+#ifndef MY_HASHTABLE_H 
+#define MY_HASHTABLE_H
 #include "token.h"
 
 struct HashEntry {
@@ -18,4 +20,4 @@ public:
     ~HashTable();
     int insert(const Token& token);
 };
-
+#endif

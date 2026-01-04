@@ -3,6 +3,5 @@ int main(){
 	char y;
 	x=8;
 	y="kf";
-	x=3;
 	return x;
 }
